@@ -113,18 +113,18 @@ class _GameScreenState extends State<GameScreen> {
                       top: 0, left: 0, right: 0,
                       child: _buildTopHUD(),
                     ),
-                    // Event log bottom-left
+                    // Event log top-left (below HUD)
                     Positioned(
-                      bottom: 4, left: 0,
-                      width: w * 0.50,
-                      height: h * 0.30,
+                      top: 32, left: 0,
+                      width: w * 0.46,
+                      height: h * 0.28,
                       child: _buildEventLog(),
                     ),
-                    // Leaderboard bottom-right
+                    // Leaderboard top-right (below HUD)
                     Positioned(
-                      bottom: 4, right: 0,
-                      width: w * 0.36,
-                      height: h * 0.30,
+                      top: 32, right: 0,
+                      width: w * 0.34,
+                      height: h * 0.28,
                       child: _buildLeaderboard(),
                     ),
                   ],

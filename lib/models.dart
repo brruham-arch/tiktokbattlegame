@@ -21,6 +21,7 @@ class Player {
   int animTimer;
   bool onGround;
   int attackCooldown;
+  bool pendingRemoval;
 
   Player({
     required this.id,
@@ -41,6 +42,7 @@ class Player {
     this.animTimer = 0,
     this.onGround = true,
     this.attackCooldown = 0,
+    this.pendingRemoval = false,
   });
 
   bool get isAlive => hp > 0 && state != PlayerState.dead;

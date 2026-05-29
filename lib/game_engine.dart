@@ -152,7 +152,7 @@ class GameEngine {
     if (target.hp <= 0) {
       target.hp = 0;
       target.state = PlayerState.dead;
-      target.stateTimer = 180;
+      target.stateTimer = 60;
       attacker.kills++;
       attacker.score += 50;
       spawnFloatingText('KO! 💀', target.x, target.y - 20, Colors.red, 18);
@@ -217,6 +217,10 @@ class GameEngine {
           player.state = PlayerState.idle;
         }
       }
+      // Mark dead players for removal after timer
+      if (player.state == PlayerState.dead && player.stateTimer == 0) {
+        player.pendingRemoval = true;
+      }
 
       player.animTimer++;
       if (player.animTimer >= 18) {
@@ -224,6 +228,9 @@ class GameEngine {
         player.animFrame = (player.animFrame + 1) % 2;
       }
     }
+
+    // Remove dead players
+    players.removeWhere((p) => p.pendingRemoval);
 
     floatingTexts.removeWhere((ft) => ft.life <= 0);
     for (final ft in floatingTexts) {
