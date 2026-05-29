@@ -41,8 +41,7 @@ class Spinner {
     this.pendingRemoval = false,
   })  : maxSize = 28.0,
         maxHp = 100,
-        spinSpeed = 0.12,
-        deadTimer = 0;
+        spinSpeed = 0.12;
 
   bool get isAlive => state == SpinnerState.alive && hp > 0;
 
