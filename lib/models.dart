@@ -20,6 +20,7 @@ class Spinner {
   int deadTimer;     // countdown sebelum benar-benar dihapus
   int score;
   bool pendingRemoval;
+  String? avatarPath; // path lokal foto profil
 
   static const double minSize = 18.0;
   static const double maxSizeCap = 72.0;
@@ -95,6 +96,7 @@ class GameEvent {
   final int? value;
   final String? keyword;
   final String? comment;
+  final String? avatarPath;
   final DateTime timestamp;
 
   GameEvent({
@@ -103,6 +105,7 @@ class GameEvent {
     this.value,
     this.keyword,
     this.comment,
+    this.avatarPath,
     required this.timestamp,
   });
 
@@ -113,6 +116,7 @@ class GameEvent {
       value: json['value'],
       keyword: json['keyword'],
       comment: json['comment'],
+      avatarPath: json['avatar_path'],
       timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
     );
   }

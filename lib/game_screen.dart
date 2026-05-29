@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'game_engine.dart';
 import 'game_canvas.dart';
@@ -15,11 +16,13 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   final GameEngine _engine = GameEngine();
+  final Map<String, ui.Image?> _avatarImages = {};
   Timer? _gameTimer;
   Timer? _fileTimer;
   bool _engineInited = false;
 
   static const String eventsFilePath = '/sdcard/tiktok_game/events.json';
+  static const String avatarDir = '/sdcard/tiktok_game/avatars';
 
   @override
   void initState() {
@@ -37,6 +40,22 @@ class _GameScreenState extends State<GameScreen> {
     if (_engineInited) return;
     _engineInited = true;
     _engine.init(w, h);
+  }
+
+  Future<void> _loadAvatar(String username, String? avatarPath) async {
+    if (_avatarImages.containsKey(username)) return;
+    if (avatarPath == null) { _avatarImages[username] = null; return; }
+    try {
+      final file = File(avatarPath);
+      if (!file.existsSync()) { _avatarImages[username] = null; return; }
+      final bytes = await file.readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes,
+          targetWidth: 128, targetHeight: 128);
+      final frame = await codec.getNextFrame();
+      if (mounted) setState(() => _avatarImages[username] = frame.image);
+    } catch (_) {
+      _avatarImages[username] = null;
+    }
   }
 
   void _pollEventsFile() {
@@ -60,10 +79,11 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       switch (event.type) {
         case 'join':
-          _engine.spawnSpinner(event.username);
+          final avatarPath = event.avatarPath;
+          final s = _engine.spawnSpinner(event.username, avatarPath: avatarPath);
+          if (avatarPath != null) _loadAvatar(event.username, avatarPath);
           break;
         case 'comment':
-          // Semua komentar = +10 ukuran, komentar "join" juga spawn
           if ((event.keyword ?? '').toLowerCase() == 'join') {
             _engine.spawnSpinner(event.username);
           }
@@ -90,41 +110,28 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final w = constraints.maxWidth;
-          final h = constraints.maxHeight;
-          _initEngineIfNeeded(w, h - 80); // 80 = HUD atas + bawah
-          return Column(
-            children: [
-              _buildTopHUD(),
-              Expanded(
-                child: Stack(
-                  children: [
-                    CustomPaint(
-                      painter: GamePainter(_engine),
-                      size: Size(w, h - 80),
-                    ),
-                    Positioned(
-                      top: 4, left: 4,
-                      width: w * 0.44,
-                      height: (h - 80) * 0.3,
-                      child: _buildEventLog(),
-                    ),
-                    Positioned(
-                      top: 4, right: 4,
-                      width: w * 0.36,
-                      height: (h - 80) * 0.3,
-                      child: _buildLeaderboard(),
-                    ),
-                  ],
-                ),
-              ),
-              _buildBottomBar(),
-            ],
-          );
-        },
-      ),
+      body: LayoutBuilder(builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+        // Arena = semua kecuali HUD atas (36) dan panel bawah (110)
+        const topH = 36.0;
+        const bottomH = 110.0;
+        final arenaH = h - topH - bottomH;
+        _initEngineIfNeeded(w, arenaH);
+
+        return Column(children: [
+          _buildTopHUD(),
+          SizedBox(
+            width: w,
+            height: arenaH,
+            child: CustomPaint(
+              painter: GamePainter(_engine, _avatarImages),
+              size: Size(w, arenaH),
+            ),
+          ),
+          _buildBottomPanel(w, bottomH),
+        ]);
+      }),
     );
   }
 
@@ -135,18 +142,21 @@ class _GameScreenState extends State<GameScreen> {
       height: 36,
       color: Colors.black,
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Row(
-        children: [
-          const Text('🌀 GASING BATTLE',
-            style: TextStyle(
-              color: Colors.cyanAccent, fontSize: 12,
-              fontFamily: 'monospace', fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            )),
-          const Spacer(),
-          _badge('🌀 $alive/${total}', Colors.cyan),
-        ],
-      ),
+      child: Row(children: [
+        const Text('🌀 GASING BATTLE',
+            style: TextStyle(color: Colors.cyanAccent, fontSize: 12,
+                fontFamily: 'monospace', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+        const Spacer(),
+        _badge('🌀 $alive/$total', Colors.cyan),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => setState(() {
+            _engineInited = false;
+            _engine.isInited = false;
+          }),
+          child: _badge('🔃', Colors.cyan),
+        ),
+      ]),
     );
   }
 
@@ -159,105 +169,81 @@ class _GameScreenState extends State<GameScreen> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(text,
-        style: TextStyle(color: color, fontSize: 10, fontFamily: 'monospace')),
+          style: TextStyle(color: color, fontSize: 10, fontFamily: 'monospace')),
     );
   }
 
-  Widget _buildEventLog() {
+  Widget _buildBottomPanel(double w, double h) {
     return Container(
-      margin: const EdgeInsets.all(2),
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.70),
-        border: Border.all(color: Colors.cyan.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('📡 LOG',
-            style: TextStyle(color: Colors.cyanAccent, fontSize: 8,
-              fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-          const SizedBox(height: 2),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _engine.eventLog.length,
-              itemBuilder: (_, i) => Text(_engine.eventLog[i],
-                style: const TextStyle(color: Colors.white70, fontSize: 8,
-                  fontFamily: 'monospace'),
-                overflow: TextOverflow.ellipsis),
+      width: w,
+      height: h,
+      color: const Color(0xFF080812),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Log panel kiri
+        Expanded(
+          flex: 6,
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              border: Border.all(color: Colors.cyan.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(4),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeaderboard() {
-    final sorted = [..._engine.spinners]..sort((a, b) => b.score.compareTo(a.score));
-    final top = sorted.take(5).toList();
-    return Container(
-      margin: const EdgeInsets.all(2),
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.70),
-        border: Border.all(color: Colors.yellowAccent.withOpacity(0.3)),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('🏆 TOP',
-            style: TextStyle(color: Colors.yellowAccent, fontSize: 8,
-              fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-          const SizedBox(height: 2),
-          ...top.asMap().entries.map((e) {
-            final medal = ['🥇','🥈','🥉','4.','5.'][e.key];
-            final s = e.value;
-            return Text('$medal ${s.displayName} ${s.score}',
-              style: TextStyle(
-                color: s.isAlive ? s.color : Colors.grey,
-                fontSize: 8, fontFamily: 'monospace',
-                decoration: s.isAlive ? null : TextDecoration.lineThrough,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('📡 LOG',
+                  style: TextStyle(color: Colors.cyanAccent, fontSize: 8,
+                      fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _engine.eventLog.length,
+                  itemBuilder: (_, i) => Text(_engine.eventLog[i],
+                      style: const TextStyle(color: Colors.white70, fontSize: 8,
+                          fontFamily: 'monospace'),
+                      overflow: TextOverflow.ellipsis),
+                ),
               ),
-              overflow: TextOverflow.ellipsis);
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return Container(
-      height: 44,
-      color: Colors.black,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _btn('🔃 REFRESH', Colors.cyan, () {
-            _engineInited = false;
-            _engine.isInited = false;
-            setState(() {});
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _btn(String label, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          border: Border.all(color: color, width: 1.5),
-          borderRadius: BorderRadius.circular(4),
+            ]),
+          ),
         ),
-        child: Text(label,
-          style: TextStyle(color: color, fontSize: 11,
-            fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-      ),
+        const SizedBox(width: 6),
+        // Leaderboard kanan
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.6),
+              border: Border.all(color: Colors.yellowAccent.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('🏆 TOP',
+                  style: TextStyle(color: Colors.yellowAccent, fontSize: 8,
+                      fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+              const SizedBox(height: 2),
+              ...([..._engine.spinners]
+                ..sort((a, b) => b.score.compareTo(a.score)))
+                  .take(5)
+                  .toList()
+                  .asMap()
+                  .entries
+                  .map((e) {
+                final medal = ['🥇', '🥈', '🥉', '4.', '5.'][e.key];
+                final s = e.value;
+                return Text('$medal ${s.displayName} ${s.score}',
+                    style: TextStyle(
+                      color: s.isAlive ? s.color : Colors.grey,
+                      fontSize: 8, fontFamily: 'monospace',
+                      decoration: s.isAlive ? null : TextDecoration.lineThrough,
+                    ),
+                    overflow: TextOverflow.ellipsis);
+              }),
+            ]),
+          ),
+        ),
+      ]),
     );
   }
 }

@@ -44,7 +44,7 @@ class GameEngine {
     }
   }
 
-  Spinner spawnSpinner(String username) {
+  Spinner spawnSpinner(String username, {String? avatarPath}) {
     final existing = findSpinner(username);
     if (existing != null) {
       if (existing.isAlive) return existing;
@@ -65,6 +65,7 @@ class GameEngine {
       vx: cos(angle) * spd,
       vy: sin(angle) * spd,
     );
+    s.avatarPath = avatarPath;
     spinners.add(s);
     _spawnText('${s.displayName} joined! 🌀', x, y - 30, s.color, 12);
     addLog('🌀 ${s.displayName} masuk arena!');
@@ -89,7 +90,7 @@ class GameEngine {
       return;
     }
     // +1 ukuran & +1 HP per like
-    s.addSize(count.toDouble());
+    s.addSize(count * 0.3);
     _spawnText('+${count} ❤️', s.x, s.y - s.size - 10, Colors.pinkAccent, 12);
     addLog('❤️ ${s.displayName} +$count ukuran');
   }

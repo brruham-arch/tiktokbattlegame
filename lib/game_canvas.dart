@@ -1,12 +1,15 @@
+import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'models.dart';
 import 'game_engine.dart';
 
 class GamePainter extends CustomPainter {
   final GameEngine engine;
+  final Map<String, ui.Image?> avatarImages;
 
-  GamePainter(this.engine);
+  GamePainter(this.engine, this.avatarImages);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -17,7 +20,6 @@ class GamePainter extends CustomPainter {
   }
 
   void _drawBackground(Canvas canvas, Size size) {
-    // Background gradien gelap
     final bgPaint = Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
@@ -26,7 +28,6 @@ class GamePainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
-    // Grid pattern
     final gridPaint = Paint()
       ..color = Colors.white.withOpacity(0.04)
       ..strokeWidth = 1;
@@ -38,7 +39,6 @@ class GamePainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
-    // Border arena
     final borderPaint = Paint()
       ..color = Colors.cyanAccent.withOpacity(0.3)
       ..strokeWidth = 2
@@ -55,70 +55,107 @@ class GamePainter extends CustomPainter {
         _drawDeadSpinner(canvas, s);
         continue;
       }
-      _drawSpinner(canvas, s);
+      _drawSpinnerBody(canvas, s);   // berputar
+      _drawAvatar(canvas, s);        // tidak berputar
       _drawHPBar(canvas, s);
       _drawLabel(canvas, s);
     }
   }
 
-  void _drawSpinner(Canvas canvas, Spinner s) {
+  // Bagian gasing yang BERPUTAR
+  void _drawSpinnerBody(Canvas canvas, Spinner s) {
     canvas.save();
     canvas.translate(s.x, s.y);
     canvas.rotate(s.angle);
 
     // Shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.4)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    canvas.drawCircle(const Offset(3, 3), s.size, shadowPaint);
+    canvas.drawCircle(
+      const Offset(3, 3), s.size,
+      Paint()
+        ..color = Colors.black.withOpacity(0.4)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
 
-    // Body utama gasing
-    final bodyPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          s.color.withOpacity(0.95),
-          s.color.withOpacity(0.6),
-          s.color.withOpacity(0.3),
-        ],
-        stops: const [0.0, 0.6, 1.0],
-      ).createShader(Rect.fromCircle(center: Offset.zero, radius: s.size));
-    canvas.drawCircle(Offset.zero, s.size, bodyPaint);
+    // Body
+    canvas.drawCircle(
+      Offset.zero, s.size,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            s.color.withOpacity(0.85),
+            s.color.withOpacity(0.5),
+            s.color.withOpacity(0.15),
+          ],
+          stops: const [0.0, 0.6, 1.0],
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: s.size)),
+    );
 
-    // Sirip gasing (3 sirip berputar)
+    // Sirip (3 sirip berputar)
     final finPaint = Paint()
-      ..color = s.color.withOpacity(0.85)
+      ..color = s.color.withOpacity(0.9)
       ..strokeWidth = s.size * 0.28
       ..strokeCap = StrokeCap.round;
     for (int i = 0; i < 3; i++) {
-      final finAngle = (i * pi * 2 / 3);
-      final x1 = cos(finAngle) * s.size * 0.4;
-      final y1 = sin(finAngle) * s.size * 0.4;
-      final x2 = cos(finAngle) * s.size * 1.0;
-      final y2 = sin(finAngle) * s.size * 1.0;
-      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), finPaint);
+      final fa = i * pi * 2 / 3;
+      canvas.drawLine(
+        Offset(cos(fa) * s.size * 0.4, sin(fa) * s.size * 0.4),
+        Offset(cos(fa) * s.size * 1.0, sin(fa) * s.size * 1.0),
+        finPaint,
+      );
     }
 
-    // Lingkaran luar (ring)
-    final ringPaint = Paint()
-      ..color = s.color
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-    canvas.drawCircle(Offset.zero, s.size * 0.95, ringPaint);
-
-    // Titik tengah
+    // Ring luar
     canvas.drawCircle(
-      Offset.zero, s.size * 0.18,
-      Paint()..color = Colors.white.withOpacity(0.9),
-    );
-
-    // Kilap
-    canvas.drawCircle(
-      Offset(-s.size * 0.25, -s.size * 0.25),
-      s.size * 0.12,
-      Paint()..color = Colors.white.withOpacity(0.5),
+      Offset.zero, s.size * 0.95,
+      Paint()
+        ..color = s.color
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke,
     );
 
     canvas.restore();
+  }
+
+  // Foto profil / inisial — TIDAK berputar
+  void _drawAvatar(Canvas canvas, Spinner s) {
+    final avatarR = s.size * 0.52;
+    final img = avatarImages[s.username];
+
+    if (img != null) {
+      // Clip lingkaran untuk foto
+      canvas.save();
+      final clipPath = Path()
+        ..addOval(Rect.fromCircle(center: Offset(s.x, s.y), radius: avatarR));
+      canvas.clipPath(clipPath);
+      canvas.drawImageRect(
+        img,
+        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+        Rect.fromCircle(center: Offset(s.x, s.y), radius: avatarR),
+        Paint(),
+      );
+      canvas.restore();
+
+      // Border foto
+      canvas.drawCircle(
+        Offset(s.x, s.y), avatarR,
+        Paint()
+          ..color = Colors.white.withOpacity(0.7)
+          ..strokeWidth = 1.5
+          ..style = PaintingStyle.stroke,
+      );
+    } else {
+      // Fallback: titik putih tengah + inisial
+      canvas.drawCircle(
+        Offset(s.x, s.y), s.size * 0.18,
+        Paint()..color = Colors.white.withOpacity(0.9),
+      );
+      // Kilap
+      canvas.drawCircle(
+        Offset(s.x - s.size * 0.25, s.y - s.size * 0.25),
+        s.size * 0.12,
+        Paint()..color = Colors.white.withOpacity(0.5),
+      );
+    }
   }
 
   void _drawDeadSpinner(Canvas canvas, Spinner s) {
@@ -126,13 +163,14 @@ class GamePainter extends CustomPainter {
     canvas.save();
     canvas.translate(s.x, s.y);
 
-    final deadPaint = Paint()
-      ..color = Colors.grey.withOpacity(opacity * 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawCircle(Offset.zero, s.size * opacity, deadPaint);
+    canvas.drawCircle(
+      Offset.zero, s.size * opacity,
+      Paint()
+        ..color = Colors.grey.withOpacity(opacity * 0.4)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
 
-    // X mark
     final xPaint = Paint()
       ..color = Colors.red.withOpacity(opacity * 0.7)
       ..strokeWidth = 3
@@ -146,30 +184,22 @@ class GamePainter extends CustomPainter {
 
   void _drawHPBar(Canvas canvas, Spinner s) {
     final barW = s.size * 2.2;
-    final barH = 5.0;
+    const barH = 5.0;
     final bx = s.x - barW / 2;
     final by = s.y + s.size + 6;
 
-    // Background
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(bx, by, barW, barH),
-        const Radius.circular(3),
-      ),
+      RRect.fromRectAndRadius(Rect.fromLTWH(bx, by, barW, barH), const Radius.circular(3)),
       Paint()..color = Colors.black.withOpacity(0.6),
     );
 
-    // HP fill
     final ratio = (s.hp / s.maxHp).clamp(0.0, 1.0);
-    final hpColor = ratio > 0.5
-        ? Color.lerp(Colors.yellow, Colors.green, (ratio - 0.5) * 2)!
-        : Color.lerp(Colors.red, Colors.yellow, ratio * 2)!;
     if (ratio > 0) {
+      final hpColor = ratio > 0.5
+          ? Color.lerp(Colors.yellow, Colors.green, (ratio - 0.5) * 2)!
+          : Color.lerp(Colors.red, Colors.yellow, ratio * 2)!;
       canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(bx, by, barW * ratio, barH),
-          const Radius.circular(3),
-        ),
+        RRect.fromRectAndRadius(Rect.fromLTWH(bx, by, barW * ratio, barH), const Radius.circular(3)),
         Paint()..color = hpColor,
       );
     }
@@ -184,16 +214,13 @@ class GamePainter extends CustomPainter {
           fontSize: (s.size * 0.38).clamp(9.0, 14.0),
           fontFamily: 'monospace',
           fontWeight: FontWeight.bold,
-          shadows: [
-            Shadow(color: Colors.black.withOpacity(0.9),
-              offset: const Offset(1, 1), blurRadius: 3),
-          ],
+          shadows: [Shadow(color: Colors.black.withOpacity(0.9), offset: const Offset(1, 1), blurRadius: 3)],
         ),
       ),
       textDirection: TextDirection.ltr,
     );
     tp.layout();
-    tp.paint(canvas, Offset(s.x - tp.width / 2, s.y - tp.height / 2));
+    tp.paint(canvas, Offset(s.x - tp.width / 2, s.y + s.size + 14));
   }
 
   void _drawFloatingTexts(Canvas canvas) {
@@ -207,9 +234,7 @@ class GamePainter extends CustomPainter {
             fontSize: ft.size,
             fontFamily: 'monospace',
             fontWeight: FontWeight.bold,
-            shadows: [Shadow(
-              color: Colors.black.withOpacity(opacity),
-              offset: const Offset(1, 1), blurRadius: 3)],
+            shadows: [Shadow(color: Colors.black.withOpacity(opacity), offset: const Offset(1, 1), blurRadius: 3)],
           ),
         ),
         textDirection: TextDirection.ltr,
