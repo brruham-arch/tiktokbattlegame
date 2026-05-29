@@ -49,7 +49,7 @@ class _GameScreenState extends State<GameScreen> {
         if (p.x > canvasW - 6.0 * 8) p.x = canvasW - 6.0 * 8;
       }
     } else {
-      _engine.spawnDummyPlayers();
+      // Tunggu pemain dari TikTok Live
     }
   }
 
@@ -276,34 +276,9 @@ class _GameScreenState extends State<GameScreen> {
       color: Colors.black,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _btn('➕ JOIN', Colors.cyan, () {
-            _engine.spawnPlayer('viewer${_engine.players.length + 1}');
-            setState(() {});
-          }),
-          _btn('❤️ LIKE', Colors.pink, () {
-            if (_engine.players.isNotEmpty) {
-              _engine.handleLike(_engine.players[0].username, 5);
-              setState(() {});
-            }
-          }),
-          _btn('🎉 SHARE', Colors.green, () {
-            if (_engine.players.isNotEmpty) {
-              _engine.handleShare(_engine.players[0].username);
-              setState(() {});
-            }
-          }),
           _btn('🔃 REFRESH', Colors.cyan, () {
-            // Reinit ukuran tanpa hapus player
-            _engineInited = false;
-            _engine.isInited = false;
-            setState(() {});
-          }),
-          _btn('🗑 RESET', Colors.orange, () {
-            _engine.players.clear();
-            _engine.eventLog.clear();
-            _engine.floatingTexts.clear();
             _engineInited = false;
             _engine.isInited = false;
             setState(() {});

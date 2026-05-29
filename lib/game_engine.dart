@@ -164,13 +164,6 @@ class GameEngine {
     if (eventLog.length > 20) eventLog.removeLast();
   }
 
-  void spawnDummyPlayers() {
-    if (!isInited) return;
-    for (final name in ['brruham', 'player2', 'xXsampXx', 'ganks99']) {
-      spawnPlayer(name);
-    }
-  }
-
   void update() {
     if (!isInited) return;
     tick++;
