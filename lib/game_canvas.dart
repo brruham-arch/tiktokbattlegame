@@ -118,38 +118,32 @@ class GamePainter extends CustomPainter {
 
   // Foto profil / inisial — TIDAK berputar
   void _drawAvatar(Canvas canvas, Spinner s) {
-    final avatarR = s.size * 0.52;
+    // avatarR selalu ikut s.size — membesar/mengecil dinamis
+    final avatarR = s.size * 0.60;
+    final center = Offset(s.x, s.y);
     final img = avatarImages[s.username];
 
     if (img != null) {
-      // Clip lingkaran untuk foto
       canvas.save();
-      final clipPath = Path()
-        ..addOval(Rect.fromCircle(center: Offset(s.x, s.y), radius: avatarR));
-      canvas.clipPath(clipPath);
-      canvas.drawImageRect(
-        img,
-        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
-        Rect.fromCircle(center: Offset(s.x, s.y), radius: avatarR),
-        Paint(),
-      );
+      // Clip lingkaran sesuai ukuran gasing saat ini
+      canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: avatarR)));
+      // drawImageRect selalu scale foto ke avatarR yang dinamis
+      final dst = Rect.fromCircle(center: center, radius: avatarR);
+      final src = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
+      canvas.drawImageRect(img, src, dst, Paint()..filterQuality = FilterQuality.low);
       canvas.restore();
 
       // Border foto
       canvas.drawCircle(
-        Offset(s.x, s.y), avatarR,
+        center, avatarR,
         Paint()
-          ..color = Colors.white.withOpacity(0.7)
+          ..color = Colors.white.withOpacity(0.6)
           ..strokeWidth = 1.5
           ..style = PaintingStyle.stroke,
       );
     } else {
-      // Fallback: titik putih tengah + inisial
-      canvas.drawCircle(
-        Offset(s.x, s.y), s.size * 0.18,
-        Paint()..color = Colors.white.withOpacity(0.9),
-      );
-      // Kilap
+      // Fallback: titik putih + kilap
+      canvas.drawCircle(center, s.size * 0.18, Paint()..color = Colors.white.withOpacity(0.9));
       canvas.drawCircle(
         Offset(s.x - s.size * 0.25, s.y - s.size * 0.25),
         s.size * 0.12,
