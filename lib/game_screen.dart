@@ -39,7 +39,7 @@ class _GameScreenState extends State<GameScreen> {
   void _initEngineIfNeeded(double canvasW, double canvasH) {
     if (_engineInited) return;
     _engineInited = true;
-    _engine.init(canvasW, canvasH, 8.0);
+    _engine.init(canvasW, canvasH, 6.0);
     _engine.spawnDummyPlayers();
   }
 
@@ -284,6 +284,7 @@ class _GameScreenState extends State<GameScreen> {
             _engine.eventLog.clear();
             _engine.floatingTexts.clear();
             _engineInited = false;
+            _engine.isInited = false;
             setState(() {});
           }),
         ],
