@@ -6,6 +6,7 @@ from TikTokLive import TikTokLiveClient
 from TikTokLive.client.web.web_settings import WebDefaults
 from TikTokLive.events import (
     ConnectEvent, DisconnectEvent, CommentEvent, LikeEvent, ShareEvent,
+    JoinEvent,
 )
 
 WebDefaults.tiktok_sign_api_key = "euler_ODY0ZTI3ZjMyNzk2ZGE3ZDg5YTVhYjAxZTY2YmYwZTBlYjMzNjFlNmFlNDE5ODRhMjVjMDBk"
@@ -42,6 +43,12 @@ async def on_connect(event: ConnectEvent):
 @client.on(DisconnectEvent)
 async def on_disconnect(event: DisconnectEvent):
     log("[DISCONNECT] Koneksi terputus.")
+
+@client.on(JoinEvent)
+async def on_join(event: JoinEvent):
+    user = event.user.nickname if event.user else "unknown"
+    log(f"[JOIN] {user} masuk live")
+    write_event({"type": "join", "username": user})
 
 @client.on(LikeEvent)
 async def on_like(event: LikeEvent):
