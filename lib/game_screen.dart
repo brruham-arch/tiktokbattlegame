@@ -39,8 +39,17 @@ class _GameScreenState extends State<GameScreen> {
   void _initEngineIfNeeded(double canvasW, double canvasH) {
     if (_engineInited) return;
     _engineInited = true;
+    final hadPlayers = _engine.players.isNotEmpty;
     _engine.init(canvasW, canvasH, 6.0);
-    _engine.spawnDummyPlayers();
+    // Reposition existing players within new bounds
+    if (hadPlayers) {
+      for (final p in _engine.players) {
+        p.y = _engine.groundY - 6.0 * 8;
+        if (p.x > canvasW - 6.0 * 8) p.x = canvasW - 6.0 * 8;
+      }
+    } else {
+      _engine.spawnDummyPlayers();
+    }
   }
 
   void _pollEventsFile() {
@@ -279,7 +288,13 @@ class _GameScreenState extends State<GameScreen> {
               setState(() {});
             }
           }),
-          _btn('🔄 RESET', Colors.orange, () {
+          _btn('🔃 REFRESH', Colors.cyan, () {
+            // Reinit ukuran tanpa hapus player
+            _engineInited = false;
+            _engine.isInited = false;
+            setState(() {});
+          }),
+          _btn('🗑 RESET', Colors.orange, () {
             _engine.players.clear();
             _engine.eventLog.clear();
             _engine.floatingTexts.clear();
