@@ -18,52 +18,35 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _gameTimer;
   Timer? _fileTimer;
   bool _engineInited = false;
-  int _joinCounter = 0;
 
   static const String eventsFilePath = '/sdcard/tiktok_game/events.json';
 
   @override
   void initState() {
     super.initState();
-    // Game loop ~30 FPS — start immediately
     _gameTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
       _engine.update();
       if (mounted) setState(() {});
     });
-    // File polling
     _fileTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       _pollEventsFile();
     });
   }
 
-  void _initEngineIfNeeded(double canvasW, double canvasH) {
+  void _initEngineIfNeeded(double w, double h) {
     if (_engineInited) return;
     _engineInited = true;
-    final hadPlayers = _engine.players.isNotEmpty;
-    _engine.init(canvasW, canvasH, 6.0);
-    // Reposition existing players within new bounds
-    if (hadPlayers) {
-      for (final p in _engine.players) {
-        p.y = _engine.groundY - 6.0 * 8;
-        if (p.x > canvasW - 6.0 * 8) p.x = canvasW - 6.0 * 8;
-      }
-    } else {
-      // Tunggu pemain dari TikTok Live
-    }
+    _engine.init(w, h);
   }
 
   void _pollEventsFile() {
     try {
       final file = File(eventsFilePath);
       if (!file.existsSync()) return;
-
       final content = file.readAsStringSync().trim();
       if (content.isEmpty) return;
       file.writeAsStringSync('');
-
-      final lines = content.split('\n');
-
-      for (final line in lines) {
+      for (final line in content.split('\n')) {
         if (line.trim().isEmpty) continue;
         try {
           final json = jsonDecode(line) as Map<String, dynamic>;
@@ -77,19 +60,20 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       switch (event.type) {
         case 'join':
-          _engine.spawnPlayer(event.username);
+          _engine.spawnSpinner(event.username);
           break;
         case 'comment':
-          // Hanya spawn jika komentar "join" dan belum ada di game
+          // Semua komentar = +10 ukuran, komentar "join" juga spawn
           if ((event.keyword ?? '').toLowerCase() == 'join') {
-            _engine.spawnPlayer(event.username);
+            _engine.spawnSpinner(event.username);
           }
+          _engine.handleComment(event.username);
           break;
         case 'like':
           _engine.handleLike(event.username, event.value ?? 1);
           break;
         case 'share':
-          _engine.handleShare(event.username);
+          _engine.handleLike(event.username, 10);
           break;
       }
     });
@@ -106,89 +90,73 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Column(
-        children: [
-          // Game canvas — flexible, takes all space except bottom bar
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final w = constraints.maxWidth;
-                final h = constraints.maxHeight;
-                _initEngineIfNeeded(w, h);
-                return Stack(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
+          _initEngineIfNeeded(w, h - 80); // 80 = HUD atas + bawah
+          return Column(
+            children: [
+              _buildTopHUD(),
+              Expanded(
+                child: Stack(
                   children: [
-                    // Canvas
                     CustomPaint(
                       painter: GamePainter(_engine),
-                      size: Size(w, h),
+                      size: Size(w, h - 80),
                     ),
-                    // Top HUD
                     Positioned(
-                      top: 0, left: 0, right: 0,
-                      child: _buildTopHUD(),
-                    ),
-                    // Event log top-left (below HUD)
-                    Positioned(
-                      top: 32, left: 0,
-                      width: w * 0.46,
-                      height: h * 0.28,
+                      top: 4, left: 4,
+                      width: w * 0.44,
+                      height: (h - 80) * 0.3,
                       child: _buildEventLog(),
                     ),
-                    // Leaderboard top-right (below HUD)
                     Positioned(
-                      top: 32, right: 0,
-                      width: w * 0.34,
-                      height: h * 0.28,
+                      top: 4, right: 4,
+                      width: w * 0.36,
+                      height: (h - 80) * 0.3,
                       child: _buildLeaderboard(),
                     ),
                   ],
-                );
-              },
-            ),
-          ),
-
-          // Bottom controls — fixed height
-          _buildControls(),
-        ],
+                ),
+              ),
+              _buildBottomBar(),
+            ],
+          );
+        },
       ),
     );
   }
 
   Widget _buildTopHUD() {
-    final alive = _engine.players.where((p) => p.isAlive).length;
-    final dead = _engine.players.where((p) => !p.isAlive).length;
+    final alive = _engine.spinners.where((s) => s.isAlive).length;
+    final total = _engine.spinners.length;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.black.withOpacity(0.85), Colors.transparent],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      height: 36,
+      color: Colors.black,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       child: Row(
         children: [
-          const Text('⚔️ TIKTOK BATTLE',
+          const Text('🌀 GASING BATTLE',
             style: TextStyle(
-              color: Colors.yellowAccent, fontSize: 13,
-              fontFamily: 'monospace', fontWeight: FontWeight.bold, letterSpacing: 2,
+              color: Colors.cyanAccent, fontSize: 12,
+              fontFamily: 'monospace', fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
             )),
-          const SizedBox(width: 10),
-          _hudBadge('👤 $alive alive', Colors.green),
-          const SizedBox(width: 6),
-          _hudBadge('💀 $dead dead', Colors.red),
+          const Spacer(),
+          _badge('🌀 $alive/${total}', Colors.cyan),
         ],
       ),
     );
   }
 
-  Widget _hudBadge(String text, Color color) {
+  Widget _badge(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withOpacity(0.15),
         border: Border.all(color: color.withOpacity(0.6)),
-        borderRadius: BorderRadius.circular(3),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(text,
         style: TextStyle(color: color, fontSize: 10, fontFamily: 'monospace')),
@@ -197,18 +165,18 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _buildEventLog() {
     return Container(
-      margin: const EdgeInsets.all(4),
-      padding: const EdgeInsets.all(6),
+      margin: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.72),
-        border: Border.all(color: Colors.cyan.withOpacity(0.4)),
+        color: Colors.black.withOpacity(0.70),
+        border: Border.all(color: Colors.cyan.withOpacity(0.3)),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('📡 BATTLE LOG',
-            style: TextStyle(color: Colors.cyanAccent, fontSize: 9,
+          const Text('📡 LOG',
+            style: TextStyle(color: Colors.cyanAccent, fontSize: 8,
               fontFamily: 'monospace', fontWeight: FontWeight.bold)),
           const SizedBox(height: 2),
           Expanded(
@@ -217,8 +185,7 @@ class _GameScreenState extends State<GameScreen> {
               itemBuilder: (_, i) => Text(_engine.eventLog[i],
                 style: const TextStyle(color: Colors.white70, fontSize: 8,
                   fontFamily: 'monospace'),
-                overflow: TextOverflow.ellipsis,
-              ),
+                overflow: TextOverflow.ellipsis),
             ),
           ),
         ],
@@ -227,53 +194,43 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildLeaderboard() {
-    final sorted = [..._engine.players]..sort((a, b) => b.score.compareTo(a.score));
+    final sorted = [..._engine.spinners]..sort((a, b) => b.score.compareTo(a.score));
     final top = sorted.take(5).toList();
-
     return Container(
-      margin: const EdgeInsets.all(4),
-      padding: const EdgeInsets.all(6),
+      margin: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.72),
-        border: Border.all(color: Colors.yellowAccent.withOpacity(0.4)),
+        color: Colors.black.withOpacity(0.70),
+        border: Border.all(color: Colors.yellowAccent.withOpacity(0.3)),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('🏆 TOP FIGHTERS',
-            style: TextStyle(color: Colors.yellowAccent, fontSize: 9,
+          const Text('🏆 TOP',
+            style: TextStyle(color: Colors.yellowAccent, fontSize: 8,
               fontFamily: 'monospace', fontWeight: FontWeight.bold)),
           const SizedBox(height: 2),
           ...top.asMap().entries.map((e) {
             final medal = ['🥇','🥈','🥉','4.','5.'][e.key];
-            final p = e.value;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Row(children: [
-                Text(medal, style: const TextStyle(fontSize: 8)),
-                const SizedBox(width: 2),
-                Expanded(child: Text(p.displayName,
-                  style: TextStyle(
-                    color: p.isAlive ? p.color : Colors.grey,
-                    fontSize: 8, fontFamily: 'monospace',
-                    decoration: p.isAlive ? null : TextDecoration.lineThrough,
-                  ), overflow: TextOverflow.ellipsis)),
-                Text('${p.score}',
-                  style: const TextStyle(color: Colors.white, fontSize: 8,
-                    fontFamily: 'monospace')),
-              ]),
-            );
+            final s = e.value;
+            return Text('$medal ${s.displayName} ${s.score}',
+              style: TextStyle(
+                color: s.isAlive ? s.color : Colors.grey,
+                fontSize: 8, fontFamily: 'monospace',
+                decoration: s.isAlive ? null : TextDecoration.lineThrough,
+              ),
+              overflow: TextOverflow.ellipsis);
           }),
         ],
       ),
     );
   }
 
-  Widget _buildControls() {
+  Widget _buildBottomBar() {
     return Container(
+      height: 44,
       color: Colors.black,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -291,7 +248,7 @@ class _GameScreenState extends State<GameScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: color.withOpacity(0.15),
           border: Border.all(color: color, width: 1.5),
