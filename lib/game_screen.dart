@@ -20,7 +20,6 @@ class _GameScreenState extends State<GameScreen> {
   DateTime _lastFileRead = DateTime.fromMillisecondsSinceEpoch(0);
   bool _engineInited = false;
   int _joinCounter = 0;
-  int _joinCounter = 0;
 
   static const String eventsFilePath = '/sdcard/tiktok_game/events.json';
 

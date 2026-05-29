@@ -55,12 +55,14 @@ class GameEvent {
   final String type;
   final String username;
   final int? value;
+  final String? keyword;
   final DateTime timestamp;
 
   GameEvent({
     required this.type,
     required this.username,
     this.value,
+    this.keyword,
     required this.timestamp,
   });
 
@@ -69,6 +71,7 @@ class GameEvent {
       type: json['type'] ?? '',
       username: json['username'] ?? '',
       value: json['value'],
+      keyword: json['keyword'],
       timestamp: DateTime.tryParse(json['timestamp'] ?? '') ?? DateTime.now(),
     );
   }
