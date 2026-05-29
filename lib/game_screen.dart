@@ -19,6 +19,8 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _fileTimer;
   DateTime _lastFileRead = DateTime.fromMillisecondsSinceEpoch(0);
   bool _engineInited = false;
+  int _joinCounter = 0;
+  int _joinCounter = 0;
 
   static const String eventsFilePath = '/sdcard/tiktok_game/events.json';
 
@@ -77,8 +79,13 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       switch (event.type) {
         case 'join':
-        case 'comment':
           _engine.spawnPlayer(event.username);
+          break;
+        case 'comment':
+          // Hanya spawn jika komentar "join" dan belum ada di game
+          if ((event.keyword ?? '').toLowerCase() == 'join') {
+            _engine.spawnPlayer(event.username);
+          }
           break;
         case 'like':
           _engine.handleLike(event.username, event.value ?? 1);

@@ -55,15 +55,10 @@ class GameEngine {
   Player spawnPlayer(String username) {
     final existing = findPlayer(username);
     if (existing != null) {
-      if (!existing.isAlive) {
-        existing.hp = existing.maxHp;
-        existing.state = PlayerState.idle;
-        existing.attackCooldown = 0;
-        existing.x = _rng.nextDouble() * (arenaWidth - scale * 14) + scale * 2;
-        existing.y = groundY - scale * 8;
-        spawnFloatingText('RESPAWN!', existing.x, existing.y - 20, Colors.cyanAccent, 14);
-        addLog('🔄 ${existing.displayName} respawned!');
-      }
+      // Sudah ada dan masih hidup — tidak spawn ulang
+      if (existing.isAlive) return existing;
+      // Sudah mati — tidak bisa join lagi, harus like dulu
+      spawnFloatingText('Already KO!', existing.x, existing.y - 20, Colors.grey, 12);
       return existing;
     }
 

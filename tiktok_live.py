@@ -12,7 +12,7 @@ WebDefaults.tiktok_sign_api_key = "euler_ODY0ZTI3ZjMyNzk2ZGE3ZDg5YTVhYjAxZTY2YmY
 USERNAME = "@brruham"
 LOG_FILE = "/sdcard/tiktok_log.txt"
 EVENTS_FILE = "/sdcard/tiktok_game/events.json"
-KEYWORDS = ["kanan", "kiri", "muter"]
+KEYWORDS = ["kanan", "kiri", "muter", "join"]
 
 client = TikTokLiveClient(unique_id=USERNAME)
 
