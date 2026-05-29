@@ -17,7 +17,6 @@ class _GameScreenState extends State<GameScreen> {
   final GameEngine _engine = GameEngine();
   Timer? _gameTimer;
   Timer? _fileTimer;
-  DateTime _lastFileRead = DateTime.fromMillisecondsSinceEpoch(0);
   bool _engineInited = false;
   int _joinCounter = 0;
 
@@ -57,12 +56,12 @@ class _GameScreenState extends State<GameScreen> {
     try {
       final file = File(eventsFilePath);
       if (!file.existsSync()) return;
-      final stat = file.statSync();
-      if (!stat.modified.isAfter(_lastFileRead)) return;
-      _lastFileRead = stat.modified;
 
-      final lines = file.readAsStringSync().trim().split('\n');
+      final content = file.readAsStringSync().trim();
+      if (content.isEmpty) return;
       file.writeAsStringSync('');
+
+      final lines = content.split('\n');
 
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
