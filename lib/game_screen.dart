@@ -18,30 +18,29 @@ class _GameScreenState extends State<GameScreen> {
   Timer? _gameTimer;
   Timer? _fileTimer;
   DateTime _lastFileRead = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _engineInited = false;
 
   static const String eventsFilePath = '/sdcard/tiktok_game/events.json';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initGame());
-  }
-
-  void _initGame() {
-    final size = MediaQuery.of(context).size;
-    _engine.init(size.width, size.height * 0.78, 8.0);
-    _engine.spawnDummyPlayers();
-
-    // Game loop ~30 FPS
+    // Game loop ~30 FPS — start immediately
     _gameTimer = Timer.periodic(const Duration(milliseconds: 33), (_) {
       _engine.update();
       if (mounted) setState(() {});
     });
-
-    // File polling 500ms
+    // File polling
     _fileTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       _pollEventsFile();
     });
+  }
+
+  void _initEngineIfNeeded(double canvasW, double canvasH) {
+    if (_engineInited) return;
+    _engineInited = true;
+    _engine.init(canvasW, canvasH, 8.0);
+    _engine.spawnDummyPlayers();
   }
 
   void _pollEventsFile() {
@@ -53,7 +52,7 @@ class _GameScreenState extends State<GameScreen> {
       _lastFileRead = stat.modified;
 
       final lines = file.readAsStringSync().trim().split('\n');
-      file.writeAsStringSync(''); // clear after read
+      file.writeAsStringSync('');
 
       for (final line in lines) {
         if (line.trim().isEmpty) continue;
@@ -69,7 +68,7 @@ class _GameScreenState extends State<GameScreen> {
     setState(() {
       switch (event.type) {
         case 'join':
-        case 'comment': // comment = join/spawn if not already in
+        case 'comment':
           _engine.spawnPlayer(event.username);
           break;
         case 'like':
@@ -91,50 +90,51 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
+      body: Column(
         children: [
-          // Game canvas
-          Positioned(
-            top: 0, left: 0, right: 0,
-            height: size.height * 0.78,
-            child: CustomPaint(
-              painter: GamePainter(_engine),
-              size: Size(size.width, size.height * 0.78),
+          // Game canvas — flexible, takes all space except bottom bar
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final h = constraints.maxHeight;
+                _initEngineIfNeeded(w, h);
+                return Stack(
+                  children: [
+                    // Canvas
+                    CustomPaint(
+                      painter: GamePainter(_engine),
+                      size: Size(w, h),
+                    ),
+                    // Top HUD
+                    Positioned(
+                      top: 0, left: 0, right: 0,
+                      child: _buildTopHUD(),
+                    ),
+                    // Event log bottom-left
+                    Positioned(
+                      bottom: 4, left: 0,
+                      width: w * 0.50,
+                      height: h * 0.30,
+                      child: _buildEventLog(),
+                    ),
+                    // Leaderboard bottom-right
+                    Positioned(
+                      bottom: 4, right: 0,
+                      width: w * 0.36,
+                      height: h * 0.30,
+                      child: _buildLeaderboard(),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
-          // Top HUD
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: _buildTopHUD(),
-          ),
-
-          // Event log (bottom left)
-          Positioned(
-            bottom: 55, left: 0,
-            width: size.width * 0.48,
-            height: size.height * 0.24,
-            child: _buildEventLog(),
-          ),
-
-          // Leaderboard (bottom right)
-          Positioned(
-            bottom: 55, right: 0,
-            width: size.width * 0.35,
-            height: size.height * 0.24,
-            child: _buildLeaderboard(),
-          ),
-
-          // Controls bottom
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            height: 50,
-            child: _buildControls(),
-          ),
+          // Bottom controls — fixed height
+          _buildControls(),
         ],
       ),
     );
@@ -142,6 +142,7 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _buildTopHUD() {
     final alive = _engine.players.where((p) => p.isAlive).length;
+    final dead = _engine.players.where((p) => !p.isAlive).length;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -161,7 +162,7 @@ class _GameScreenState extends State<GameScreen> {
           const SizedBox(width: 10),
           _hudBadge('👤 $alive alive', Colors.green),
           const SizedBox(width: 6),
-          _hudBadge('💀 ${_engine.players.where((p) => !p.isAlive).length} dead', Colors.red),
+          _hudBadge('💀 $dead dead', Colors.red),
         ],
       ),
     );
@@ -200,7 +201,8 @@ class _GameScreenState extends State<GameScreen> {
             child: ListView.builder(
               itemCount: _engine.eventLog.length,
               itemBuilder: (_, i) => Text(_engine.eventLog[i],
-                style: const TextStyle(color: Colors.white70, fontSize: 8, fontFamily: 'monospace'),
+                style: const TextStyle(color: Colors.white70, fontSize: 8,
+                  fontFamily: 'monospace'),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -244,7 +246,8 @@ class _GameScreenState extends State<GameScreen> {
                     decoration: p.isAlive ? null : TextDecoration.lineThrough,
                   ), overflow: TextOverflow.ellipsis)),
                 Text('${p.score}',
-                  style: const TextStyle(color: Colors.white, fontSize: 8, fontFamily: 'monospace')),
+                  style: const TextStyle(color: Colors.white, fontSize: 8,
+                    fontFamily: 'monospace')),
               ]),
             );
           }),
@@ -255,8 +258,8 @@ class _GameScreenState extends State<GameScreen> {
 
   Widget _buildControls() {
     return Container(
-      color: Colors.black.withOpacity(0.9),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      color: Colors.black,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -280,7 +283,7 @@ class _GameScreenState extends State<GameScreen> {
             _engine.players.clear();
             _engine.eventLog.clear();
             _engine.floatingTexts.clear();
-            _engine.spawnDummyPlayers();
+            _engineInited = false;
             setState(() {});
           }),
         ],
@@ -292,7 +295,7 @@ class _GameScreenState extends State<GameScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: color.withOpacity(0.15),
           border: Border.all(color: color, width: 1.5),

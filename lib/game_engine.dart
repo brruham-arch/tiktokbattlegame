@@ -13,6 +13,7 @@ class GameEngine {
   double arenaHeight = 0;
   double scale = 8.0;
   int tick = 0;
+  bool isInited = false;
 
   // Auto battle config
   static const int attackCooldownTicks = 60; // ~2 detik per attack
@@ -37,6 +38,7 @@ class GameEngine {
     arenaHeight = height;
     scale = pixelScale;
     groundY = height - scale * 10;
+    isInited = true;
   }
 
   Color _nextColor() {
