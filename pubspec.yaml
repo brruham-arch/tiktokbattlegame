@@ -10,7 +10,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  dart_json_mapper: ^2.2.5
 
 dev_dependencies:
   flutter_test:
