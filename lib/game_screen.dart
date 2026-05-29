@@ -85,12 +85,14 @@ class _GameScreenState extends State<GameScreen> {
           break;
         case 'comment':
           if ((event.keyword ?? '').toLowerCase() == 'join') {
-            _engine.spawnSpinner(event.username);
+            _engine.spawnSpinner(event.username, avatarPath: event.avatarPath);
           }
           _engine.handleComment(event.username);
+          if (event.avatarPath != null) _loadAvatar(event.username, event.avatarPath);
           break;
         case 'like':
           _engine.handleLike(event.username, event.value ?? 1);
+          if (event.avatarPath != null) _loadAvatar(event.username, event.avatarPath);
           break;
         case 'share':
           _engine.handleLike(event.username, 10);

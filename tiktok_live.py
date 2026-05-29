@@ -61,22 +61,20 @@ async def download_avatar(username: str, url: str) -> str | None:
     return None
 
 def get_avatar_url(user) -> str | None:
-    """Ambil URL foto profil dari user object."""
+    """Ambil URL foto profil dari user object TikTokLive 6.x (ImageModel.m_urls)."""
     if not user:
         return None
-    # Coba beberapa atribut yang mungkin ada di versi berbeda
-    for attr in ['avatar_thumb', 'avatar_larger', 'avatar_medium']:
+    for attr in ['avatar_thumb', 'avatar_medium', 'avatar_large', 'avatar_jpg']:
         obj = getattr(user, attr, None)
         if obj:
-            url = getattr(obj, 'url_list', None)
-            if url and len(url) > 0:
-                return url[0]
-            url = getattr(obj, 'url', None)
-            if url:
-                return url
-    # Fallback langsung
-    url = getattr(user, 'profile_picture_url', None) or getattr(user, 'avatar_url', None)
-    return url
+            urls = getattr(obj, 'm_urls', None)
+            if urls and len(urls) > 0:
+                # Pilih URL .jpeg kalau ada, lebih mudah dibaca Flutter
+                for u in urls:
+                    if u.endswith('.jpeg') or '.jpeg?' in u:
+                        return u
+                return urls[0]
+    return None
 
 @client.on(ConnectEvent)
 async def on_connect(event: ConnectEvent):
@@ -105,10 +103,13 @@ async def on_like(event: LikeEvent):
     count = getattr(event, 'count', 1) or 1
     total = getattr(event, 'total', '?')
     log(f"[LIKE] {user} +{count} | Total: {total}")
+    avatar_url = get_avatar_url(event.user)
+    avatar_path = await download_avatar(user, avatar_url) if avatar_url else None
     write_event({
         "type": "like",
         "username": user,
         "value": count,
+        "avatar_path": avatar_path,
     })
 
 @client.on(CommentEvent)
@@ -124,18 +125,14 @@ async def on_comment(event: CommentEvent):
             log(f"[KEYWORD:{keyword.upper()}] {user}: {comment}")
             break
 
-    # Download avatar kalau belum ada
     avatar_url = get_avatar_url(event.user)
-    safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in user)
-    avatar_path = os.path.join(AVATAR_DIR, f"{safe_name}.jpg")
-    if not os.path.exists(avatar_path) and avatar_url:
-        asyncio.ensure_future(download_avatar(user, avatar_url))
-
+    avatar_path = await download_avatar(user, avatar_url) if avatar_url else None
     write_event({
         "type": "comment",
         "username": user,
         "comment": comment,
         "keyword": matched_keyword,
+        "avatar_path": avatar_path,
     })
 
 @client.on(ShareEvent)
