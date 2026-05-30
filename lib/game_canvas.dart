@@ -57,7 +57,6 @@ class GamePainter extends CustomPainter {
       }
       _drawSpinnerBody(canvas, s);   // berputar
       _drawAvatar(canvas, s);        // tidak berputar
-      _drawHPBar(canvas, s);
       _drawLabel(canvas, s);
     }
   }
@@ -119,7 +118,7 @@ class GamePainter extends CustomPainter {
   // Foto profil / inisial — TIDAK berputar
   void _drawAvatar(Canvas canvas, Spinner s) {
     // avatarR selalu ikut s.size — membesar/mengecil dinamis
-    final avatarR = s.size * 0.60;
+    final avatarR = s.size * 0.88;
     final center = Offset(s.x, s.y);
     final img = avatarImages[s.username];
 
