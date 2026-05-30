@@ -22,8 +22,8 @@ class Spinner {
   bool pendingRemoval;
   String? avatarPath; // path lokal foto profil
 
-  static const double minSize = 18.0;
-  static const double maxSizeCap = 72.0;
+  static const double minSize = 10.0;
+  static const double maxSizeCap = 35.0;
   static const double baseSpeed = 2.8;
 
   Spinner({
